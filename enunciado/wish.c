@@ -34,7 +34,7 @@ void vector_append(Vector *v, char *item)
         v->capacity *= 2;
         v->data = (char **)realloc(v->data, v->capacity * sizeof(char *));
     }
-    v->data[v->size++] = item; // Store the pointer, don't copy the string
+    v->data[v->size++] = item;
 }
 
 char *vector_get(Vector *v, int index)
@@ -50,7 +50,7 @@ void vector_pop(Vector *v)
 {
     if (v->size > 0)
     {
-        v->size--; // Reducimos el tamaño del vector para "eliminar" el último elemento
+        v->size--;
     }
 }
 
@@ -95,11 +95,11 @@ int handle_builtin_commands(Vector items)
     {
         if (items.size == 1)
         {
-            vector_free(&PATH); // Clear PATH
+            vector_free(&PATH); 
         }
         else
         {
-            vector_free(&PATH); // Clear the current PATH
+            vector_free(&PATH);
             for (int i = 1; i < items.size; i++)
             {
                 vector_append(&PATH, vector_get(&items, i));
@@ -119,14 +119,12 @@ int handle_external_commands(Vector items)
     int background = 0;
     pid_t pid;
 
-    // Buscar si hay redirección de salida (>)
     for (int i = 0; i < items.size; i++)
     {
         if (strcmp(">", vector_get(&items, i)) == 0 && i + 1 < items.size)
         {
             output_file = vector_get(&items, i + 1);
             redirection = 1;
-            // Eliminar ">" y el archivo de la lista de items
             vector_pop(&items);
             vector_pop(&items);
             break;
@@ -134,13 +132,11 @@ int handle_external_commands(Vector items)
         else if (strcmp("&", vector_get(&items, i)) == 0)
         {
             background = 1;
-            // Eliminar el "&" de la lista de items
             vector_pop(&items);
             break;
         }
     }
 
-    // Buscar el comando en el PATH y ejecutarlo
     for (int i = 0; i < PATH.size; i++)
     {
         char *dir = (char *)malloc((strlen(vector_get(&PATH, i)) + strlen(command) + 2) * sizeof(char));
@@ -148,55 +144,50 @@ int handle_external_commands(Vector items)
 
         if (access(dir, X_OK) == 0)
         {
-            // Preparamos los argumentos para execv
-            char *argv[items.size + 1]; // Añadimos uno más para el NULL terminator
+            char *argv[items.size + 1];
             for (int j = 0; j < items.size; j++)
             {
                 argv[j] = vector_get(&items, j);
             }
-            argv[items.size] = NULL; // Añadimos el terminador NULL
+            argv[items.size] = NULL;
 
             pid = fork();
             if (pid == 0)
             {
-                // Si hay redirección, redirigir la salida
                 if (redirection)
                 {
-                    int fd = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644); // Usar O_TRUNC para sobrescribir el archivo
+                    int fd = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644); 
                     if (fd == -1)
                     {
                         print_error();
                         exit(1);
                     }
-                    dup2(fd, STDOUT_FILENO); // Redirigir STDOUT al archivo
+                    dup2(fd, STDOUT_FILENO);
                     close(fd);
                 }
 
-                // Ejecutar el comando
                 execv(dir, argv);
-                print_error(); // Si execv falla
+                print_error(); 
                 exit(1);
             }
             else if (pid > 0)
             {
-                // Si el comando está en segundo plano, no esperamos aquí
                 if (background)
                 {
-                    continue; // El proceso sigue ejecutándose en paralelo
+                    continue;
                 }
                 else
                 {
-                    // Si es un proceso en primer plano, esperamos aquí
-                    waitpid(pid, NULL, 0); // Esperar a que termine el proceso
+                    waitpid(pid, NULL, 0);
                 }
             }
             else
             {
-                print_error(); // Error en fork
+                print_error();
             }
 
             free(dir);
-            return pid; // Devuelve el PID para procesos en segundo plano
+            return pid;
         }
 
         free(dir);
@@ -244,7 +235,7 @@ Vector parse_input(char *expression)
         if (expression[i] == '&')
         {
             if (start != -1)
-            { // Si hay un comando antes de '&', agregarlo primero
+            {
                 s = (char *)malloc((i - start + 1) * sizeof(char));
                 strncpy(s, &expression[start], i - start);
                 s[i - start] = '\0';
@@ -262,7 +253,7 @@ Vector parse_input(char *expression)
                 start = i;
             }
             if (i == len - 1)
-            { // Último carácter
+            { 
                 s = (char *)malloc((i - start + 2) * sizeof(char));
                 strncpy(s, &expression[start], i - start + 1);
                 s[i - start + 1] = '\0';
@@ -290,7 +281,7 @@ int main(int argc, char *argv[])
 
     FILE *input_stream = NULL;
 
-    // Verificación de archivos de entrada
+
     for (int i = 1; i < argc; i++)
     {
         FILE *aux_file = fopen(argv[i], "r");
@@ -322,24 +313,21 @@ int main(int argc, char *argv[])
         input_stream = stdin;
     }
 
-    // Inicializando el vector PATH
     PATH = create_vector();
     vector_append(&PATH, "./");
     vector_append(&PATH, "/usr/bin/");
     vector_append(&PATH, "/bin/");
 
-    pid_t background_pids[100]; // Array para almacenar los pids de procesos en segundo plano
+    pid_t background_pids[100];
     int bg_pid_count = 0;
 
     while (1)
     {
-        // Check if we are reading from a file or stdin
         if (input_stream == stdin)
         {
             printf("wish> ");
         }
 
-        // Leer entrada
         size_t n = 0;
         int in_len = getline(&expression, &n, input_stream);
 
@@ -355,21 +343,18 @@ int main(int argc, char *argv[])
             }
         }
 
-        // Verificar EOF
         if (feof(input_stream))
         {
             break;
         }
 
-        // Reemplazar salto de línea por carácter NULL
         expression[in_len - 1] = '\0';
 
-        // Parsear la entrada en un vector de elementos
         items = parse_input(expression);
 
         if (vector_get(&items, 0) == NULL)
         {
-            vector_free(&items); // Liberar vector en caso de entrada vacía
+            vector_free(&items); 
             continue;
         }
 
@@ -377,8 +362,8 @@ int main(int argc, char *argv[])
         int is_background = 0;
         if (strcmp(vector_get(&items, items.size - 1), "&") == 0)
         {
-            is_background = 1;  // Marcar comando como en segundo plano
-            vector_pop(&items); // Eliminar '&' del comando
+            is_background = 1; 
+            vector_pop(&items);
         }
 
         int pids[items.size];
@@ -407,12 +392,12 @@ int main(int argc, char *argv[])
                     }
                 }
 
-                // Validar si la redirección es válida
+            
                 if (is_valid_redirection(actual))
                 {
-                    // Intentar ejecutar un comando incorporado
+                    
                     in_exec = handle_builtin_commands(actual);
-                    // Si no es un comando incorporado, intentar ejecutar un comando externo
+                   
                     if (in_exec == 0)
                     {
                         int pid = handle_external_commands(actual);
@@ -428,12 +413,12 @@ int main(int argc, char *argv[])
                 }
 
                 full_cmd = 0;
-                vector_free(&actual);     // Liberar vector después de procesar
-                actual = create_vector(); // Reinitialize the actual vector
+                vector_free(&actual);     
+                actual = create_vector(); 
             }
         }
 
-        // Esperar a que los procesos en segundo plano terminen
+        
         for (int i = 0; i < bg_pid_count; i++)
         {
             waitpid(background_pids[i], NULL, 0);
@@ -441,11 +426,9 @@ int main(int argc, char *argv[])
 
         free(expression);
         expression = NULL;
-        vector_free(&items); // Liberar vector de elementos después de cada entrada
+        vector_free(&items); 
     }
 
-    vector_free(&PATH); // Liberar vector PATH cuando termine
+    vector_free(&PATH); 
     return 0;
 }
-
-// EOF
